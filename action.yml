@@ -11,6 +11,10 @@ inputs:
     description: Markdown file to write.
     required: false
     default: PR-CHECKLIST.md
+  config:
+    description: Optional config file path.
+    required: false
+    default: ""
   fail_on_risk:
     description: Optional risk threshold that fails the action: low, medium, or high.
     required: false
@@ -27,6 +31,9 @@ runs:
       shell: bash
       run: |
         args=(--base "${{ inputs.base }}" --out "${{ inputs.output }}")
+        if [ -n "${{ inputs.config }}" ]; then
+          args+=(--config "${{ inputs.config }}")
+        fi
         if [ -n "${{ inputs.fail_on_risk }}" ]; then
           args+=(--fail-on-risk "${{ inputs.fail_on_risk }}")
         fi

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 - 2026-06-01
+
+### Added
+
+- Repository-local `.pr-checklist.json` config support.
+- Custom ignore patterns, review signal patterns, and checklist items.
+- Config documentation and validation tests.
+
 ## 0.2.0 - 2026-06-01
 
 ### Added

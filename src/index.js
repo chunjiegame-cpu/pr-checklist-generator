@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 const TEST_PATTERNS = [/(\b|\/)(test|tests|spec|__tests__)(\/|\b)/i, /\.(test|spec)\.[jt]sx?$/i];
@@ -7,6 +8,7 @@ const CONFIG_PATTERNS = [/package\.json$/, /package-lock\.json$/, /\.ya?ml$/i, /
 const SECURITY_PATTERNS = [/auth/i, /security/i, /permission/i, /token/i, /secret/i, /password/i];
 const API_PATTERNS = [/api/i, /routes?/i, /controllers?/i, /server/i];
 const UI_PATTERNS = [/\.[jt]sx$/i, /components?\//i, /pages?\//i, /styles?\//i, /\.css$/i];
+const KNOWN_PATTERN_GROUPS = ["docs", "tests", "config", "api", "ui", "security"];
 
 export function collectDiff(cwd, base = "main") {
   const nameStatus = execFileSync("git", ["diff", "--name-status", `${base}...HEAD`], {
@@ -34,8 +36,28 @@ export function parseNameStatus(output) {
     });
 }
 
-export function createChecklist(diff) {
-  const areas = classifyFiles(diff.files);
+export function loadConfig(cwd, configPath) {
+  const requestedPath = Boolean(configPath);
+  const resolvedPath = path.resolve(cwd, configPath ?? ".pr-checklist.json");
+
+  if (!fs.existsSync(resolvedPath)) {
+    if (requestedPath) {
+      throw new Error(`Config file not found: ${resolvedPath}`);
+    }
+    return normalizeConfig();
+  }
+
+  try {
+    return normalizeConfig(JSON.parse(fs.readFileSync(resolvedPath, "utf8")), resolvedPath);
+  } catch (error) {
+    throw new Error(`Could not read config file ${resolvedPath}: ${error.message}`);
+  }
+}
+
+export function createChecklist(diff, options = {}) {
+  const config = normalizeConfig(options.config);
+  const { files, ignoredFiles } = applyIgnore(diff.files, config.ignore);
+  const areas = classifyFiles(files, config.patterns);
   const checklist = [
     "Confirmed the change is scoped to the PR description.",
     "Ran the relevant tests locally or in CI.",
@@ -49,13 +71,15 @@ export function createChecklist(diff) {
   if (areas.api > 0) checklist.push("Checked API compatibility, status codes, and migration impact.");
   if (areas.ui > 0) checklist.push("Verified UI states, responsive behavior, and screenshots when relevant.");
   if (areas.security > 0) checklist.push("Reviewed authentication, authorization, and secret-handling implications.");
+  checklist.push(...config.checklist);
 
-  const risk = estimateRisk(diff.files, areas);
+  const risk = estimateRisk(files, areas);
 
   return {
     base: diff.base,
     stat: diff.stat,
-    files: diff.files,
+    files,
+    ignoredFiles,
     areas,
     risk,
     checklist,
@@ -85,24 +109,28 @@ export function formatChecklist(result) {
     "",
     "## Changed Files",
     "",
-    ...formatFiles(result.files)
+    ...formatFiles(result.files),
+    "",
+    "## Ignored Files",
+    "",
+    ...formatFiles(result.ignoredFiles ?? [])
   ];
 
   return `${lines.join("\n")}\n`;
 }
 
-function classifyFiles(files) {
+function classifyFiles(files, customPatterns = {}) {
   const areas = { docs: 0, tests: 0, config: 0, api: 0, ui: 0, security: 0, source: 0 };
 
   for (const file of files) {
-    if (matches(file.path, DOC_PATTERNS)) areas.docs += 1;
-    else if (matches(file.path, TEST_PATTERNS)) areas.tests += 1;
-    else if (matches(file.path, CONFIG_PATTERNS)) areas.config += 1;
+    if (matches(file.path, DOC_PATTERNS, customPatterns.docs)) areas.docs += 1;
+    else if (matches(file.path, TEST_PATTERNS, customPatterns.tests)) areas.tests += 1;
+    else if (matches(file.path, CONFIG_PATTERNS, customPatterns.config)) areas.config += 1;
     else areas.source += 1;
 
-    if (matches(file.path, API_PATTERNS)) areas.api += 1;
-    if (matches(file.path, UI_PATTERNS)) areas.ui += 1;
-    if (matches(file.path, SECURITY_PATTERNS)) areas.security += 1;
+    if (matches(file.path, API_PATTERNS, customPatterns.api)) areas.api += 1;
+    if (matches(file.path, UI_PATTERNS, customPatterns.ui)) areas.ui += 1;
+    if (matches(file.path, SECURITY_PATTERNS, customPatterns.security)) areas.security += 1;
   }
 
   return areas;
@@ -163,6 +191,56 @@ function formatList(items, formatter) {
   return items.length ? items.map(formatter) : ["- None"];
 }
 
-function matches(value, patterns) {
-  return patterns.some((pattern) => pattern.test(value));
+function applyIgnore(files, ignorePatterns) {
+  const ignoredFiles = [];
+  const keptFiles = [];
+
+  for (const file of files) {
+    if (matchesCustom(file.path, ignorePatterns)) ignoredFiles.push(file);
+    else keptFiles.push(file);
+  }
+
+  return { files: keptFiles, ignoredFiles };
+}
+
+function normalizeConfig(config = {}, configPath = null) {
+  const patterns = {};
+  const rawPatterns = config.patterns ?? {};
+
+  for (const key of Object.keys(rawPatterns)) {
+    if (!KNOWN_PATTERN_GROUPS.includes(key)) {
+      throw new Error(`Unknown config pattern group: ${key}`);
+    }
+    patterns[key] = asStringArray(rawPatterns[key], `patterns.${key}`);
+  }
+
+  return {
+    path: configPath,
+    ignore: asStringArray(config.ignore, "ignore"),
+    checklist: asStringArray(config.checklist, "checklist"),
+    patterns
+  };
+}
+
+function asStringArray(value, label) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`Config field ${label} must be an array of strings`);
+  }
+  return value;
+}
+
+function matches(value, defaultPatterns, customPatterns = []) {
+  return defaultPatterns.some((pattern) => pattern.test(value)) || matchesCustom(value, customPatterns);
+}
+
+function matchesCustom(value, patterns = []) {
+  return patterns.some((pattern) => globToRegex(pattern).test(value.replace(/\\/g, "/")));
+}
+
+function globToRegex(pattern) {
+  const normalized = pattern.replace(/\\/g, "/");
+  const escaped = normalized.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const regex = escaped.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*");
+  return new RegExp(`^${regex}$`, "i");
 }

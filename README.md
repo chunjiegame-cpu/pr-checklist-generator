@@ -33,6 +33,7 @@ node bin/pr-checklist.js --base main
 ```bash
 pr-checklist
 pr-checklist --base origin/main
+pr-checklist --config .pr-checklist.json
 pr-checklist --fail-on-risk high
 pr-checklist --out PR-CHECKLIST.md
 pr-checklist --json
@@ -118,6 +119,7 @@ Risk scoring is intentionally simple and explainable:
 | Option | Description |
 | --- | --- |
 | `--base <ref>` | Base ref for `git diff`. Defaults to `main`. |
+| `--config <file>` | Config file path. Defaults to `.pr-checklist.json` when present. |
 | `--json` | Print machine-readable JSON. |
 | `--fail-on-risk <level>` | Exit `2` when risk is at least `low`, `medium`, or `high`. |
 | `-o, --out <file>` | Write Markdown output to a file. |
@@ -130,6 +132,26 @@ Risk scoring is intentionally simple and explainable:
 3. Use `fail_on_risk: high` when a project wants manual attention on risky PRs.
 4. File false positives as issues so review signals can improve without becoming noisy.
 5. Treat the output as review support, not an approval decision.
+
+## Repository Config
+
+Projects can tune the default signals with `.pr-checklist.json`:
+
+```json
+{
+  "ignore": ["dist/**", "docs/generated/**"],
+  "patterns": {
+    "security": ["infra/policies/**"],
+    "api": ["src/http/**"],
+    "tests": ["e2e/**"]
+  },
+  "checklist": [
+    "Checked rollout and rollback notes."
+  ]
+}
+```
+
+Supported pattern groups are `docs`, `tests`, `config`, `api`, `ui`, and `security`. Patterns use simple `*` and `**` matching.
 
 ## Codex for OSS Notes
 
