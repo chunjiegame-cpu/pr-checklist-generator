@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: chunjiegame-cpu/pr-checklist-generator@v0.2.0
+      - uses: chunjiegame-cpu/pr-checklist-generator@v0.2.1
         with:
           base: origin/${{ github.base_ref }}
           output: PR-CHECKLIST.md
