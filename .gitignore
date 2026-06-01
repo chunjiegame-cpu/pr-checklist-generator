@@ -1,0 +1,5 @@
+node_modules/
+coverage/
+*.log
+PR-CHECKLIST.md
+.DS_Store

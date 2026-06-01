@@ -1,0 +1,42 @@
+{
+  "name": "pr-checklist-generator",
+  "version": "0.1.0",
+  "description": "Generate review checklists from git diffs for maintainers and contributors.",
+  "type": "module",
+  "bin": {
+    "pr-checklist": "./bin/pr-checklist.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "cli",
+    "github",
+    "pull-request",
+    "code-review",
+    "maintainer-tools",
+    "open-source"
+  ],
+  "author": "chunjiegame-cpu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chunjiegame-cpu/pr-checklist-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chunjiegame-cpu/pr-checklist-generator/issues"
+  },
+  "homepage": "https://github.com/chunjiegame-cpu/pr-checklist-generator#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
