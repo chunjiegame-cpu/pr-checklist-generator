@@ -50,12 +50,14 @@ export function createChecklist(diff) {
   if (areas.ui > 0) checklist.push("Verified UI states, responsive behavior, and screenshots when relevant.");
   if (areas.security > 0) checklist.push("Reviewed authentication, authorization, and secret-handling implications.");
 
+  const risk = estimateRisk(diff.files, areas);
+
   return {
     base: diff.base,
     stat: diff.stat,
     files: diff.files,
     areas,
-    risk: estimateRisk(diff.files, areas),
+    risk,
     checklist,
     reviewNotes: buildReviewNotes(diff.files, areas)
   };
@@ -76,6 +78,10 @@ export function formatChecklist(result) {
     "## Review Notes",
     "",
     ...result.reviewNotes.map((note) => `- ${note}`),
+    "",
+    "## Risk Reasons",
+    "",
+    ...formatList(result.risk.reasons, (reason) => `- ${reason}`),
     "",
     "## Changed Files",
     "",
@@ -104,15 +110,38 @@ function classifyFiles(files) {
 
 function estimateRisk(files, areas) {
   let score = 0;
-  score += files.length >= 20 ? 3 : files.length >= 8 ? 2 : files.length >= 3 ? 1 : 0;
-  if (areas.security) score += 3;
-  if (areas.api) score += 2;
-  if (areas.config) score += 1;
-  if (areas.tests === 0 && areas.source > 0) score += 2;
+  const reasons = [];
 
-  if (score >= 6) return { level: "high", score };
-  if (score >= 3) return { level: "medium", score };
-  return { level: "low", score };
+  if (files.length >= 20) {
+    score += 3;
+    reasons.push("Large change set with 20 or more files.");
+  } else if (files.length >= 8) {
+    score += 2;
+    reasons.push("Moderate change set with 8 or more files.");
+  } else if (files.length >= 3) {
+    score += 1;
+    reasons.push("Multiple files changed.");
+  }
+
+  if (areas.security) {
+    score += 3;
+    reasons.push("Security-sensitive path or filename detected.");
+  }
+  if (areas.api) {
+    score += 2;
+    reasons.push("API-facing files changed.");
+  }
+  if (areas.config) {
+    score += 1;
+    reasons.push("Configuration or automation files changed.");
+  }
+  if (areas.tests === 0 && areas.source > 0) {
+    score += 2;
+    reasons.push("Source changed without detected test changes.");
+  }
+
+  const level = score >= 6 ? "high" : score >= 3 ? "medium" : "low";
+  return { level, score, reasons: reasons.length ? reasons : ["No elevated risk signals detected."] };
 }
 
 function buildReviewNotes(files, areas) {
@@ -128,6 +157,10 @@ function buildReviewNotes(files, areas) {
 
 function formatFiles(files) {
   return files.length ? files.map((file) => `- ${file.status} \`${file.path}\``) : ["- None"];
+}
+
+function formatList(items, formatter) {
+  return items.length ? items.map(formatter) : ["- None"];
 }
 
 function matches(value, patterns) {

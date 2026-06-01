@@ -1,0 +1,43 @@
+name: PR Checklist Generator
+description: Generate a risk-aware pull request review checklist from git diff metadata.
+author: chunjiegame-cpu
+
+inputs:
+  base:
+    description: Base ref for git diff.
+    required: false
+    default: main
+  output:
+    description: Markdown file to write.
+    required: false
+    default: PR-CHECKLIST.md
+  fail_on_risk:
+    description: Optional risk threshold that fails the action: low, medium, or high.
+    required: false
+    default: ""
+  add_to_summary:
+    description: Append the generated checklist to the GitHub Actions job summary.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Generate PR checklist
+      shell: bash
+      run: |
+        args=(--base "${{ inputs.base }}" --out "${{ inputs.output }}")
+        if [ -n "${{ inputs.fail_on_risk }}" ]; then
+          args+=(--fail-on-risk "${{ inputs.fail_on_risk }}")
+        fi
+
+        set +e
+        node "$GITHUB_ACTION_PATH/bin/pr-checklist.js" "${args[@]}"
+        status=$?
+        set -e
+
+        if [ "${{ inputs.add_to_summary }}" = "true" ] && [ -f "${{ inputs.output }}" ]; then
+          cat "${{ inputs.output }}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        exit "$status"

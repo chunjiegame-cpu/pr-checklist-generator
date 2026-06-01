@@ -1,15 +1,20 @@
 {
   "name": "pr-checklist-generator",
-  "version": "0.1.0",
-  "description": "Generate review checklists from git diffs for maintainers and contributors.",
+  "version": "0.2.0",
+  "description": "Generate risk-aware PR review checklists from git diffs for maintainers.",
   "type": "module",
   "bin": {
     "pr-checklist": "./bin/pr-checklist.js"
   },
   "files": [
+    "action.yml",
     "bin",
     "src",
+    "docs",
+    "examples",
     "README.md",
+    "CHANGELOG.md",
+    "ROADMAP.md",
     "LICENSE"
   ],
   "exports": {
@@ -24,7 +29,9 @@
     "pull-request",
     "code-review",
     "maintainer-tools",
-    "open-source"
+    "open-source",
+    "security-review",
+    "github-action"
   ],
   "author": "chunjiegame-cpu",
   "repository": {

@@ -1,0 +1,22 @@
+name: PR checklist
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: chunjiegame-cpu/pr-checklist-generator@v0.2.0
+        with:
+          base: origin/${{ github.base_ref }}
+          output: PR-CHECKLIST.md
+          fail_on_risk: high
+          add_to_summary: "true"

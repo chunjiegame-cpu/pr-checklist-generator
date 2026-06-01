@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createChecklist, formatChecklist, parseNameStatus } from "../src/index.js";
 
@@ -20,6 +20,7 @@ test("creates risk-aware checklist", () => {
   });
 
   assert.equal(result.risk.level, "high");
+  assert.ok(result.risk.reasons.some((item) => item.includes("Security-sensitive")));
   assert.ok(result.checklist.some((item) => item.includes("secret-handling")));
   assert.ok(result.reviewNotes.some((item) => item.includes("Source changed without detected test changes")));
 });
@@ -32,6 +33,7 @@ test("formats Markdown checklist", () => {
   }));
 
   assert.match(markdown, /PR Review Checklist/);
+  assert.match(markdown, /Risk Reasons/);
   assert.match(markdown, /Changed Files/);
 });
 
@@ -40,4 +42,12 @@ test("CLI help renders", () => {
   const output = execFileSync(process.execPath, [bin, "--help"], { encoding: "utf8" });
 
   assert.match(output, /Usage: pr-checklist/);
+});
+
+test("CLI validates fail-on-risk values", () => {
+  const bin = fileURLToPath(new URL("../bin/pr-checklist.js", import.meta.url));
+  const result = spawnSync(process.execPath, [bin, "--fail-on-risk", "critical"], { encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /low, medium, or high/);
 });
