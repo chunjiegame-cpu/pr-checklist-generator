@@ -24,5 +24,21 @@ PR Checklist Generator intentionally starts with transparent filename and diff m
 
 - Diff hunk summaries for changed functions.
 - Optional Codex-assisted review explanations.
-- Repository-local config for teams that use different folder names.
 - GitHub Action modes for summary-only, fail-on-risk, and artifact upload.
+
+## Repository Config
+
+Projects can add `.pr-checklist.json` to tune signals without changing the default rules:
+
+```json
+{
+  "ignore": ["dist/**"],
+  "patterns": {
+    "security": ["infra/policies/**"],
+    "tests": ["e2e/**"]
+  },
+  "checklist": ["Checked rollout and rollback notes."]
+}
+```
+
+Unknown pattern groups are rejected so typos do not silently weaken review coverage.

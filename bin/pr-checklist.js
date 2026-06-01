@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-import { collectDiff, createChecklist, formatChecklist } from "../src/index.js";
+import { collectDiff, createChecklist, formatChecklist, loadConfig } from "../src/index.js";
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -12,7 +12,8 @@ if (args.help) {
 
 try {
   const diff = collectDiff(process.cwd(), args.base);
-  const checklist = createChecklist(diff);
+  const config = loadConfig(process.cwd(), args.config);
+  const checklist = createChecklist(diff, { config });
 
   if (args.json) {
     console.log(JSON.stringify(checklist, null, 2));
@@ -37,12 +38,13 @@ try {
 }
 
 function parseArgs(argv) {
-  const parsed = { base: "main", json: false, output: undefined, failOnRisk: undefined, help: false };
+  const parsed = { base: "main", config: undefined, json: false, output: undefined, failOnRisk: undefined, help: false };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") parsed.help = true;
     else if (arg === "--base") parsed.base = argv[++index];
+    else if (arg === "--config") parsed.config = argv[++index];
     else if (arg === "--json") parsed.json = true;
     else if (arg === "--fail-on-risk") parsed.failOnRisk = argv[++index];
     else if (arg === "--out" || arg === "-o") parsed.output = argv[++index];
@@ -66,6 +68,7 @@ function printHelp() {
 
 Options:
   --base <ref>       Base ref for git diff (default: main)
+  --config <file>    Config file path (default: .pr-checklist.json when present)
   --json             Print machine-readable JSON
   --fail-on-risk <n> Exit 2 when risk is low, medium, or high
   -o, --out <file>   Write Markdown output to a file

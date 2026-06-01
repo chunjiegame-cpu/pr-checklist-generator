@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createChecklist, formatChecklist, parseNameStatus } from "../src/index.js";
+import { createChecklist, formatChecklist, loadConfig, parseNameStatus } from "../src/index.js";
 
 test("parses git name-status output", () => {
   const files = parseNameStatus("M\tsrc/api/users.js\nA\ttest/users.test.js\nR100\told.md\tREADME.md");
@@ -35,6 +38,7 @@ test("formats Markdown checklist", () => {
   assert.match(markdown, /PR Review Checklist/);
   assert.match(markdown, /Risk Reasons/);
   assert.match(markdown, /Changed Files/);
+  assert.match(markdown, /Ignored Files/);
 });
 
 test("CLI help renders", () => {
@@ -50,4 +54,42 @@ test("CLI validates fail-on-risk values", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /low, medium, or high/);
+});
+
+test("loads repository-local config", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pr-checklist-config-"));
+  fs.writeFileSync(path.join(dir, ".pr-checklist.json"), JSON.stringify({
+    ignore: ["dist/**"],
+    patterns: {
+      security: ["infra/policies/**"],
+      tests: ["e2e/**"]
+    },
+    checklist: ["Checked custom rollout notes."]
+  }));
+
+  const config = loadConfig(dir);
+  const result = createChecklist({
+    base: "main",
+    stat: "3 files changed",
+    files: parseNameStatus("M\tinfra/policies/access.rego\nM\tdist/bundle.js\nA\te2e/login.spec.js")
+  }, { config });
+
+  assert.equal(result.ignoredFiles.length, 1);
+  assert.equal(result.areas.security, 1);
+  assert.equal(result.areas.tests, 1);
+  assert.ok(result.checklist.includes("Checked custom rollout notes."));
+});
+
+test("rejects unknown config pattern groups", () => {
+  assert.throws(() => createChecklist({
+    base: "main",
+    stat: "",
+    files: []
+  }, {
+    config: {
+      patterns: {
+        migrations: ["db/**"]
+      }
+    }
+  }), /Unknown config pattern group/);
 });
